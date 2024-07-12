@@ -14,7 +14,7 @@ ouputPath=/path/to/src/api url="https://your-project.localhost/docs.jsonopenapi"
   })(),
 
   /** The path for the base output folder */
-  ouputPath: Deno.env.get("outputPath") ?? `/tmp/src/api`,
+  outputPath: Deno.env.get("outputPath") ?? `/tmp/src/api`,
   importPrefix: Deno.env.get("importPrefix") ?? `src/api`,
   operationsSelector: /./,
 

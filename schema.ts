@@ -37,7 +37,7 @@ export const buildSchemaName = (schema: OpenApiSchema): string => {
   throw new Error(`Unhandled schema`);
 };
 
-type Type = "string" | "null" | "boolean" | "integer" | "array";
+type Type = "string" | "null" | "boolean" | "integer" | "number" | "array";
 export type PropDef = {
   required: boolean;
   entityName: string;
@@ -75,6 +75,8 @@ const zodSchemaPropCode = (
     ? `z.boolean().nullable()`
     : propDef.type === "boolean"
     ? `z.boolean()`
+    : propDef.type === "number"
+    ? `z.number()`
     : propDef.type?.includes?.("integer") && propDef.type.includes?.("null")
     ? `z.number().nullable()`
     : propDef.type === "integer"
@@ -396,7 +398,7 @@ export function buildSchemasCode(context: Context) {
 
   const schemasCodeByPath = Object.fromEntries(
     Object.values(schemasByName).map((schema) => {
-      const path = `${context.ouputPath}/schemas/${schema.zodName}.ts`;
+      const path = `${context.outputPath}/schemas/${schema.zodName}.ts`;
       const code = buildSchemaCode(schema, context);
       return [path, code];
     }),

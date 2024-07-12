@@ -132,22 +132,6 @@ const buildRepositoryCode = (
   operations: Array<Operation>,
   context: Context,
 ): string => {
-  const imports = Array.from(
-    new Set([
-      `import { useQueryClient } from "@tanstack/react-query";`,
-      `import { UseFormReturn } from "react-hook-form";`,
-      `import { useApiQuery, useApiCollectionQuery } from "src/api/useApiQuery";`,
-      `import useApiMutation from "src/api/useApiMutation";`,
-      `import { createOrUpdate, deleteResource, getCollection } from "src/repositories/api";`,
-      ...[
-        ...operations.map((op) => op.requestSchema?.zodName),
-        ...operations.map((op) => op.responseSchema?.zodName),
-      ].filter(Boolean).map((zodSchemaName) =>
-        importFromZodSchemaName(zodSchemaName!, context, true)
-      ),
-    ]),
-  );
-
   const hooks: Array<string> = operations.map((operation) => {
     const { method, path, hook, parameters, requestSchema } = operation;
     const { name: hookName, desc } = hook;
@@ -198,7 +182,7 @@ export function buildRepositoriesCode(context: Context) {
   const repositoriesCodesByPath = Object.fromEntries(
     Object.entries(operationsByEntityName).map(([entityName, operations]) => {
       const path =
-        `${context.ouputPath}/repositories/${entityName}Repository.ts`;
+        `${context.outputPath}/repositories/${entityName}Repository.ts`;
       const code = buildRepositoryCode(operations, context);
       return [path, code];
     }),

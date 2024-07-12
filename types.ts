@@ -36,7 +36,7 @@ export type Parameter = {
 
 export type Context = {
   apiDocUrl: string;
-  ouputPath: string;
+  outputPath: string;
   operationsSelector: RegExp;
   importPrefix: string;
 

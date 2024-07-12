@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-cond-assign
-import { analyzeOpenApiSchema } from "./schema.ts";
+import { OpenApiSchema, analyzeOpenApiSchema } from "./schema.ts";
 import { Context, Operation, Parameter } from "./types.ts";
 import { pascalCase, singular, toJsIdentifier, ucFirst } from "./utils.ts";
 
@@ -33,7 +33,7 @@ const buildHookName = (operation: Operation, type: HookInfo["type"]) => {
   const { path, method } = operation;
 
   const nameFromPath = path
-    .replaceAll(/\/(\w+s)\/\{\w+\}/g, (_, m) => "/" + singular(m)) // "/foos/{id}" => "/foo"
+    .replaceAll(/\/([\w-]+s)\/\{[\w-]+\}/g, (_, m) => "/" + singular(m)) // "/foos/{id}" => "/foo"
     .split(/[^\w]+/)
     .map(pascalCase)
     .join("");
@@ -41,21 +41,6 @@ const buildHookName = (operation: Operation, type: HookInfo["type"]) => {
   const nameFromPath2 = operation.method === "post"
     ? singular(nameFromPath) // POST /foos => Foo
     : nameFromPath;
-
-  // SROB
-
-  // const nameFromPath = (m = path.match(/^\/(\w+s)\/\{\w+\}$/)) // "/foos/{id}"
-  //   ? pascalCase(singular(m[1])) // "Foo"
-  //   : (m = path.match(/^\/(\w+)$/)) // "/foo"
-  //   ? pascalCase(m[1]) // "Foo"
-  //   : (m = path.match(/^\/(\w+s)\/\{\w+\}\/(\w+)$/)) // "/foos/{id}/bar"
-  //   ? [singular(m[1]), m[2]].map(pascalCase).join("") // "FooBar"
-  //   : (m = path.match(/^\/(\w+(?:\/\w+)+)$/)) // "/foo/bar"
-  //   ? m.map(pascalCase).join("") // "FooBar"
-  //   : (() => {
-  //     console.error({ path });
-  //     throw new Error("Unhandled path");
-  //   })();
 
   return [
     "use",
@@ -77,6 +62,31 @@ const buildHookInfo = (operation: Operation): HookInfo => {
   return { type, name, desc };
 };
 
+const parameterToHookArgType = (schema: Parameter["schema"]): string => {
+  return schema.type?.enum
+  ? schema.type.enum.map((value: any) => JSON.stringify(value)).join(
+    " | ",
+  )
+  : schema.type === "string" && schema.enum
+  ? `(${
+    schema.enum.map((value: any) => JSON.stringify(value)).join(" | ")
+  })`
+  : schema.type === "string"
+  ? "string"
+  : schema.type === "integer" && schema.default
+  ? `number = ${JSON.stringify(schema.default)}`
+  : schema.type === "integer"
+  ? "number"
+  : schema.type === "boolean"
+  ? "boolean"
+  : schema.type === "array" && schema.items
+  ? `Array<${parameterToHookArgType(schema.items)}>`
+  : (() => {
+    console.debug({ schema });
+    throw new Error("To be implemented");
+  })()
+};
+
 const parameterToHookArg = (parameter: Parameter): string => {
   const { tsName, schema, required } = parameter;
 
@@ -84,26 +94,7 @@ const parameterToHookArg = (parameter: Parameter): string => {
     tsName,
     required === false && schema.default === undefined ? "?" : "",
     ": ",
-    schema.type?.enum
-      ? schema.type.enum.map((value: any) => JSON.stringify(value)).join(
-        " | ",
-      )
-      : schema.type === "string" && schema.enum
-      ? `(${
-        schema.enum.map((value: any) => JSON.stringify(value)).join(" | ")
-      })`
-      : schema.type === "string"
-      ? "string"
-      : schema.type === "integer" && schema.default
-      ? `number = ${JSON.stringify(schema.default)}`
-      : schema.type === "integer"
-      ? "number"
-      : schema.type === "boolean"
-      ? "boolean"
-      : (() => {
-        console.debug({ parameter });
-        throw new Error("To be implemented");
-      })(),
+    parameterToHookArgType(schema),
   ].join("");
 };
 

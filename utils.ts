@@ -23,6 +23,7 @@ export const singular = (text: string) => {
 
 export const toJsIdentifier = (text: string) =>
   text
+    .replace(/(\w+)\[\]$/, (_, m) => plural(m)) // "Foo[]" => "Foos"
     .replaceAll(/[^\w]+(\w)/g, (_, m) => m.toUpperCase())
     .replaceAll(/[^\w]+/g, "");
 
