@@ -21,6 +21,8 @@ export function addImportBy(
   return ""; // So we can use this in template strings ;)
 }
 
+const importPathSortKey = (path: string) => path.replace(/^~/, '');
+
 export function buildImports(keys: Array<any>, excludePath?: string): string {
   const importsDefs = keys.map((key) => (importsBy.get(key) ?? [])).flat();
 
@@ -35,7 +37,11 @@ export function buildImports(keys: Array<any>, excludePath?: string): string {
     `${importDef.symbol}${importDef.alias ? ` as ${importDef.alias}` : ""}`;
 
   const codeLines = [];
-  for (const [path, importsBySymbol] of Object.entries(importsByPath)) {
+  const sortedEntries = Object
+    .entries(importsByPath)
+    .sort((a, b) => importPathSortKey(a[0]).localeCompare(importPathSortKey(b[0])));
+
+  for (const [path, importsBySymbol] of sortedEntries) {
     if (path === excludePath) continue;
     const { _default, ...others } = importsBySymbol;
 
@@ -46,7 +52,9 @@ export function buildImports(keys: Array<any>, excludePath?: string): string {
     if (otherImportsDefs.length > 0) {
       parts.push(
         `{${
-          otherImportsDefs.map((importDef) => (" " + withAlias(importDef)))
+          otherImportsDefs
+            .sort((a, b) => a.symbol.localeCompare(b.symbol))
+            .map((importDef) => (" " + withAlias(importDef)))
             .join(",")
         } }`,
       );

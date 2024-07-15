@@ -1,15 +1,12 @@
-import { buildImports } from "./imports.ts";
-import { addImportBy } from "./imports.ts";
+import { addImportBy, buildImports } from "./imports.ts";
 import { Context, Operation, Parameter } from "./types.ts";
-import {
-  importFromZodSchemaName,
-  lcFirst,
-  plural,
-  toJsIdentifier,
-  toJsObjKey,
-} from "./utils.ts";
+import { lcFirst, plural, toJsIdentifier, toJsObjKey } from "./utils.ts";
 
-const buildPath = (path: string, context: Context, operation?: Operation): string => {
+const buildPath = (
+  path: string,
+  context: Context,
+  operation?: Operation,
+): string => {
   const queryParamsNames = (operation?.parameters ?? [])
     .filter((parameter) => parameter.in === "query")
     .map((parameter) =>
@@ -25,19 +22,26 @@ const buildPath = (path: string, context: Context, operation?: Operation): strin
   }${
     queryParamsNames.length > 0
       ? `\${${
-        addImportBy(operation, "serializeSearchParams", `${context.importPrefix}/client`)
+        addImportBy(
+          operation,
+          "serializeSearchParams",
+          `${context.importPrefix}/client`,
+        )
       }serializeSearchParams({${queryParamsNames.join(",")} })}`
       : ""
   }\``;
 };
 
-const buildReadHookFnBody = (operation: Operation, context: Context): string => {
+const buildReadHookFnBody = (
+  operation: Operation,
+  context: Context,
+): string => {
   const { responseSchema, queryKey } = operation;
-  addImportBy(operation, "useApiQuery", "src/api/useApiQuery");
+  addImportBy(operation, "useApiQuery", `${context.importPrefix}/client`);
   addImportBy(
     operation,
     responseSchema!.zodName,
-    `src/api/schemas/${responseSchema!.zodName}`,
+    `${context.importPrefix}/schemas/${responseSchema!.zodName}`,
   );
 
   return `return useApiQuery({
@@ -47,11 +51,14 @@ const buildReadHookFnBody = (operation: Operation, context: Context): string => 
   });`;
 };
 
-const buildCreateUpdateHookFnBody = (operation: Operation, context: Context): string => {
+const buildCreateHookFnBody = (
+  operation: Operation,
+  context: Context,
+): string => {
   const { requestSchema, method, queryKey } = operation;
   addImportBy(operation, "useQueryClient", "@tanstack/react-query");
-  addImportBy(operation, "createOrUpdate", "src/repositories/api");
-  addImportBy(operation, "useApiMutation", "src/api/useApiMutation", true);
+  addImportBy(operation, "create", `${context.importPrefix}/client`);
+  addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
 
   return `const queryClient = useQueryClient();
   return useApiMutation({
@@ -62,11 +69,11 @@ const buildCreateUpdateHookFnBody = (operation: Operation, context: Context): st
         addImportBy(
           operation,
           requestSchema.name,
-          `src/api/schemas/${requestSchema.zodName}`,
+          `${context.importPrefix}/schemas/${requestSchema.zodName}`,
         )
       }`
       : ""
-  }) => createOrUpdate("${method}", ${buildPath(operation.path, context)}${
+  }) => create(${buildPath(operation.path, context)}${
     requestSchema ? `, data` : ""
   }),
     onSuccess: async () => {
@@ -76,16 +83,51 @@ const buildCreateUpdateHookFnBody = (operation: Operation, context: Context): st
   });`;
 };
 
-const buildDeleteHookFnBody = (operation: Operation, context: Context): string => {
+const buildUpdateHookFnBody = (
+  operation: Operation,
+  context: Context,
+): string => {
+  const { requestSchema, method, queryKey } = operation;
   addImportBy(operation, "useQueryClient", "@tanstack/react-query");
-  addImportBy(operation, "deleteResource", "src/repositories/api");
-  addImportBy(operation, "useApiMutation", "src/api/useApiMutation", true);
+  addImportBy(operation, "update", `${context.importPrefix}/client`);
+  addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
+
+  return `const queryClient = useQueryClient();
+  return useApiMutation({
+    mutationKey: [${queryKey.join(", ")}],
+    mutationFn: async (${
+    requestSchema
+      ? `data: ${requestSchema.name}${
+        addImportBy(
+          operation,
+          requestSchema.name,
+          `${context.importPrefix}/schemas/${requestSchema.zodName}`,
+        )
+      }`
+      : ""
+  }) => update(${buildPath(operation.path, context)}${
+    requestSchema ? `, data` : ""
+  }),
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({ queryKey: [${queryKey[0]}] });
+    },
+    form,
+  });`;
+};
+
+const buildDeleteHookFnBody = (
+  operation: Operation,
+  context: Context,
+): string => {
+  addImportBy(operation, "useQueryClient", "@tanstack/react-query");
+  addImportBy(operation, "delete_", `${context.importPrefix}/client`);
+  addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
 
   const { queryKey } = operation;
   return `const queryClient = useQueryClient();
   return useApiMutation({
     mutationKey: [${queryKey.join(", ")}],
-    mutationFn: async (): Promise<void> => deleteResource(${
+    mutationFn: async (): Promise<void> => delete_(${
     buildPath(operation.path, context)
   }),
     onSuccess: async () => {
@@ -94,13 +136,20 @@ const buildDeleteHookFnBody = (operation: Operation, context: Context): string =
   });`;
 };
 
-const buildListHookFnBody = (operation: Operation, context: Context): string => {
+const buildListHookFnBody = (
+  operation: Operation,
+  context: Context,
+): string => {
   const { queryKey, responseSchema } = operation;
-  addImportBy(operation, "useApiCollectionQuery", "src/api/useApiQuery");
+  addImportBy(
+    operation,
+    "useApiCollectionQuery",
+    `${context.importPrefix}/client`,
+  );
   addImportBy(
     operation,
     responseSchema!.zodName,
-    `src/api/schemas/${responseSchema!.zodName}`,
+    `${context.importPrefix}/schemas/${responseSchema!.zodName}`,
   );
 
   return `return useApiCollectionQuery({
@@ -117,9 +166,8 @@ const buildHookFnBody = (operation: Operation, context: Context): string => {
     ...(parameters ?? []).map((param: Parameter) => param.tsName),
   ];
 
-  if (type === "create" || type === "update") {
-    return buildCreateUpdateHookFnBody(operation, context);
-  }
+  if (type === "create") return buildCreateHookFnBody(operation, context);
+  if (type === "update") return buildUpdateHookFnBody(operation, context);
   if (type === "read") return buildReadHookFnBody(operation, context);
   if (type === "delete") return buildDeleteHookFnBody(operation, context);
   if (type === "list") return buildListHookFnBody(operation, context);
