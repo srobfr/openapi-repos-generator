@@ -1,6 +1,6 @@
-import { addImportBy, buildImports, importsBy } from "./imports.ts";
+import { addImportBy, buildImports } from "./imports.ts";
 import { Context, Property, Schema } from "./types.ts";
-import { importFromZodSchemaName, toJsObjKey, ucFirst } from "./utils.ts";
+import { toJsObjKey, ucFirst } from "./utils.ts";
 
 export type OpenApiSchema = {
   $ref?: string;
@@ -110,12 +110,7 @@ const zodSchemaPropCode = (
     : (() => {
       console.error("Unhandled type", { propName, propDef });
       throw new Error("Unhandled type");
-      // return `(TODO Unhandled type)`;
     })();
-
-  // if (isRecursive) {
-  //   return `z.lazy(() => ${zodDef})`;
-  // }
 
   return zodDef;
 };

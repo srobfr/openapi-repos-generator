@@ -55,7 +55,7 @@ const buildCreateHookFnBody = (
   operation: Operation,
   context: Context,
 ): string => {
-  const { requestSchema, method, queryKey } = operation;
+  const { requestSchema, queryKey } = operation;
   addImportBy(operation, "useQueryClient", "@tanstack/react-query");
   addImportBy(operation, "create", `${context.importPrefix}/client`);
   addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
@@ -87,7 +87,7 @@ const buildUpdateHookFnBody = (
   operation: Operation,
   context: Context,
 ): string => {
-  const { requestSchema, method, queryKey } = operation;
+  const { requestSchema, queryKey } = operation;
   addImportBy(operation, "useQueryClient", "@tanstack/react-query");
   addImportBy(operation, "update", `${context.importPrefix}/client`);
   addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
