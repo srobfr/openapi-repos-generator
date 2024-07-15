@@ -21,7 +21,7 @@ export function addImportBy(
   return ""; // So we can use this in template strings ;)
 }
 
-const importPathSortKey = (path: string) => path.replace(/^~/, '');
+const importPathSortKey = (path: string) => path.replace(/^~/, 'zzzz');
 
 export function buildImports(keys: Array<any>, excludePath?: string): string {
   const importsDefs = keys.map((key) => (importsBy.get(key) ?? [])).flat();
