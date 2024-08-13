@@ -1,5 +1,5 @@
 // deno-lint-ignore-file no-cond-assign
-import { OpenApiSchema, analyzeOpenApiSchema } from "./schema.ts";
+import { analyzeOpenApiSchema } from "./schema.ts";
 import { Context, Operation, Parameter } from "./types.ts";
 import { pascalCase, singular, toJsIdentifier, ucFirst } from "./utils.ts";
 
@@ -64,27 +64,25 @@ const buildHookInfo = (operation: Operation): HookInfo => {
 
 const parameterToHookArgType = (schema: Parameter["schema"]): string => {
   return schema.type?.enum
-  ? schema.type.enum.map((value: any) => JSON.stringify(value)).join(
-    " | ",
-  )
-  : schema.type === "string" && schema.enum
-  ? `(${
-    schema.enum.map((value: any) => JSON.stringify(value)).join(" | ")
-  })`
-  : schema.type === "string"
-  ? "string"
-  : schema.type === "integer" && schema.default
-  ? `number = ${JSON.stringify(schema.default)}`
-  : schema.type === "integer"
-  ? "number"
-  : schema.type === "boolean"
-  ? "boolean"
-  : schema.type === "array" && schema.items
-  ? `Array<${parameterToHookArgType(schema.items)}>`
-  : (() => {
-    console.debug({ schema });
-    throw new Error("To be implemented");
-  })()
+    ? schema.type.enum.map((value: any) => JSON.stringify(value)).join(
+      " | ",
+    )
+    : schema.type === "string" && schema.enum
+    ? `(${schema.enum.map((value: any) => JSON.stringify(value)).join(" | ")})`
+    : schema.type === "string"
+    ? "string"
+    : schema.type === "integer" && schema.default
+    ? `number = ${JSON.stringify(schema.default)}`
+    : schema.type === "integer"
+    ? "number"
+    : schema.type === "boolean"
+    ? "boolean"
+    : schema.type === "array" && schema.items
+    ? `Array<${parameterToHookArgType(schema.items)}>`
+    : (() => {
+      console.debug({ schema });
+      throw new Error("To be implemented");
+    })();
 };
 
 const parameterToHookArg = (parameter: Parameter): string => {
@@ -143,7 +141,16 @@ Code provided below is probably buggy.`;
 
 const analyzeResponseBody = (operation: Operation, context: Context) => {
   const responseBody = operation.responses["200"];
-  if (!responseBody) return;
+  if (!responseBody) {
+    if (operation.method === "get") {
+      // Weird. Show a warning message
+      console.error(
+        `⚠️ Found a GET operation without 200 response! It will be ignored: `,
+        operation,
+      );
+    }
+    return;
+  }
 
   if (!responseBody.content?.["application/ld+json"]?.schema) {
     console.log(`Unhandled responseBody: `, responseBody);

@@ -37,6 +37,10 @@ const buildReadHookFnBody = (
   context: Context,
 ): string => {
   const { responseSchema, queryKey } = operation;
+  if (!responseSchema) {
+    console.log({ operation }); // SROB
+  }
+
   addImportBy(operation, "useApiQuery", `${context.importPrefix}/client`);
   addImportBy(
     operation,
@@ -180,21 +184,26 @@ const buildRepositoryCode = (
   operations: Array<Operation>,
   context: Context,
 ): string => {
-  const hooks: Array<string> = operations.map((operation) => {
-    const { method, path, hook, parameters, requestSchema } = operation;
-    const { name: hookName, desc } = hook;
-    const args = [
-      ...(parameters ?? []).map((param: Parameter) => param.hookArgStr),
-      ...(requestSchema
-        ? [
-          `form: ${
-            addImportBy(operation, "UseFormReturn", "react-hook-form")
-          }UseFormReturn<${requestSchema.name}>`,
-        ]
-        : []),
-    ].join(", ");
+  const hooks: Array<string> = operations
+    .filter((operation) => {
+      if (operation.method === "get" && !operation.responseSchema) return false; // Weird case of GET endpoint not returning data
+      return true;
+    })
+    .map((operation) => {
+      const { method, path, hook, parameters, requestSchema } = operation;
+      const { name: hookName, desc } = hook;
+      const args = [
+        ...(parameters ?? []).map((param: Parameter) => param.hookArgStr),
+        ...(requestSchema
+          ? [
+            `form: ${
+              addImportBy(operation, "UseFormReturn", "react-hook-form")
+            }UseFormReturn<${requestSchema.name}>`,
+          ]
+          : []),
+      ].join(", ");
 
-    const body = `/**
+      const body = `/**
  * ${desc}
  * Endpoint: ${method.toUpperCase()} ${path}
  * API Platform id : ${operation.operationId}
@@ -203,15 +212,15 @@ export function ${hookName}(${args}) {
   ${buildHookFnBody(operation, context)}
 }`;
 
-    if (operation.cantGenerateReason) {
-      return `TODO ${operation.cantGenerateReason}\n${body}`.replaceAll(
-        /^|\n/g,
-        (m) => `${m[0] ?? ""}// `,
-      );
-    }
+      if (operation.cantGenerateReason) {
+        return `TODO ${operation.cantGenerateReason}\n${body}`.replaceAll(
+          /^|\n/g,
+          (m) => `${m[0] ?? ""}// `,
+        );
+      }
 
-    return body;
-  });
+      return body;
+    });
 
   return `${buildImports(operations)}
 
