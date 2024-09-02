@@ -52,6 +52,7 @@ const buildReadHookFnBody = (
     queryKey: [${queryKey.join(", ")}],
     path: ${buildPath(operation.path, context)},
     schema: ${responseSchema!.zodName},
+    ...options,
   });`;
 };
 
@@ -84,6 +85,7 @@ const buildCreateHookFnBody = (
       await queryClient.invalidateQueries({ queryKey: [${queryKey[0]}] });
     },
     form,
+    ...options,
   });`;
 };
 
@@ -95,6 +97,11 @@ const buildUpdateHookFnBody = (
   addImportBy(operation, "useQueryClient", "@tanstack/react-query");
   addImportBy(operation, "update", `${context.importPrefix}/client`);
   addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
+  addImportBy(
+    operation,
+    "UseApiQueryOptions",
+    `${context.importPrefix}/client`,
+  );
 
   return `const queryClient = useQueryClient();
   return useApiMutation({
@@ -116,6 +123,7 @@ const buildUpdateHookFnBody = (
       await queryClient.invalidateQueries({ queryKey: [${queryKey[0]}] });
     },
     form,
+    ...options,
   });`;
 };
 
@@ -125,7 +133,16 @@ const buildDeleteHookFnBody = (
 ): string => {
   addImportBy(operation, "useQueryClient", "@tanstack/react-query");
   addImportBy(operation, "delete_", `${context.importPrefix}/client`);
-  addImportBy(operation, "useApiMutation", `${context.importPrefix}/client`);
+  addImportBy(
+    operation,
+    "UseApiMutationOptions",
+    `${context.importPrefix}/client`,
+  );
+  addImportBy(
+    operation,
+    "UseApiQueryOptions",
+    `${context.importPrefix}/client`,
+  );
 
   const { queryKey } = operation;
   return `const queryClient = useQueryClient();
@@ -137,6 +154,7 @@ const buildDeleteHookFnBody = (
     onSuccess: async () => {
       await queryClient.invalidateQueries({ queryKey: [${queryKey[0]}] });
     },
+    ...options,
   });`;
 };
 
@@ -160,6 +178,7 @@ const buildListHookFnBody = (
     queryKey: [${queryKey.join(", ")}],
     path: ${buildPath(operation.path, context, operation)},
     schema: ${responseSchema!.zodName},
+    ...options,
   });`;
 };
 
@@ -190,25 +209,50 @@ const buildRepositoryCode = (
       return true;
     })
     .map((operation) => {
-      const { method, path, hook, parameters, requestSchema } = operation;
+      const { method, path, hook, parameters, requestSchema, responseSchema } =
+        operation;
       const { name: hookName, desc } = hook;
+
       const args = [
-        ...(parameters ?? []).map((param: Parameter) => param.hookArgStr),
+        ...(parameters ?? []).map((param: Parameter) =>
+          `  ${param.hookArgStr},`
+        ),
         ...(requestSchema
           ? [
-            `form: ${
+            `  form: ${
               addImportBy(operation, "UseFormReturn", "react-hook-form")
-            }UseFormReturn<${requestSchema.name}>`,
+            }UseFormReturn<${requestSchema.name}>,`,
           ]
-          : []),
-      ].join(", ");
+          : []), // SROB imports
+        `  options: Partial<${
+          method === "get"
+            ? `${
+              addImportBy(
+                operation,
+                "UseApiQueryOptions",
+                `${context.importPrefix}/client`,
+              )
+            }UseApiQueryOptions<TQueryKey, typeof ${responseSchema?.zodName}>`
+            : `${
+              addImportBy(
+                operation,
+                "UseApiMutationOptions",
+                `${context.importPrefix}/client`,
+              )
+            }UseApiMutationOptions<any, any, any>`
+        }> = {},`,
+      ].join("\n");
 
       const body = `/**
  * ${desc}
  * Endpoint: ${method.toUpperCase()} ${path}
  * API Platform id : ${operation.operationId}
  */
-export function ${hookName}(${args}) {
+export function ${hookName}<TQueryKey extends ${// SROB Déplacer la signature dans chaque stratégie, ce sera plus clean
+        addImportBy(operation, "QueryKey", `@tanstack/react-query`)
+      }QueryKey>(
+${args}
+) {
   ${buildHookFnBody(operation, context)}
 }`;
 
